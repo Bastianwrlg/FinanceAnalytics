@@ -1,0 +1,7 @@
+{
+  "name": "PODA E-Liquid Finance Analytics",
+  "description": "Comprehensive financial analytics and real-time dashboard for PODA E-Liquid Company covering Sales, Bahan Baku, HPP, OPEX, Marketing Expense, AR & AP with Google Spreadsheet synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
