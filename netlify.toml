@@ -1,0 +1,41 @@
+[build]
+  command = "npm run build:client"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API routes to Netlify Functions
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
+  from = "/api/sync-sheet"
+  to = "/.netlify/functions/sync-sheet"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai-financial-summary"
+  to = "/.netlify/functions/ai-financial-summary"
+  status = 200
+
+# Single Page App fallback routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
