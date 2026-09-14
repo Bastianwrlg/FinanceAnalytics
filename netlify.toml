@@ -5,7 +5,8 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--legacy-peer-deps"
+  NPM_FLAGS = "--include=dev --legacy-peer-deps"
+  NODE_ENV = "development"
 
 # Proxy API routes to Netlify Functions
 [[redirects]]
