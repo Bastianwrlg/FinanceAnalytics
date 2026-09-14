@@ -1,30 +1,13 @@
 [build]
-  command = "npm run build:client"
+  command = "npm run build"
   publish = "dist"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--include=dev --legacy-peer-deps"
   NODE_ENV = "development"
 
-# Proxy API routes to Netlify Functions
-[[redirects]]
-  from = "/api/health"
-  to = "/.netlify/functions/health"
-  status = 200
-
-[[redirects]]
-  from = "/api/sync-sheet"
-  to = "/.netlify/functions/sync-sheet"
-  status = 200
-
-[[redirects]]
-  from = "/api/ai-financial-summary"
-  to = "/.netlify/functions/ai-financial-summary"
-  status = 200
-
-# Single Page App fallback routing
+# SPA routing redirect
 [[redirects]]
   from = "/*"
   to = "/index.html"

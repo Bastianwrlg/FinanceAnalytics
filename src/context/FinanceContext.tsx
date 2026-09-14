@@ -228,27 +228,56 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSyncError(null);
 
     try {
-      const response = await fetch(`/api/sync-sheet?url=${encodeURIComponent(targetUrl)}`);
-      const data = await response.json();
+      let csvContent = '';
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Gagal sinkronisasi dengan spreadsheet');
+      // Try server /api/sync-sheet first (if running on custom server / dev)
+      try {
+        const response = await fetch(`/api/sync-sheet?url=${encodeURIComponent(targetUrl)}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.csv && data.csv.trim().length > 20) {
+            csvContent = data.csv;
+          }
+        }
+      } catch {
+        // Backend not available (static Netlify / Cloudflare deploy), proceed to direct fetch
       }
 
-      if (data.csv && data.csv.trim().length > 20) {
-        setCurrentCsv(data.csv);
-        localStorage.setItem('poda_financial_csv', data.csv);
+      // Direct Google Sheet fetch fallback (works on static hosting without backend)
+      if (!csvContent) {
+        let directUrl = targetUrl;
+        const match = targetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const sheetId = match[1];
+          const gidMatch = targetUrl.match(/[#&?]gid=([0-9]+)/);
+          const gid = gidMatch ? gidMatch[1] : '0';
+          directUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+        }
+
+        const directRes = await fetch(directUrl);
+        if (directRes.ok) {
+          const text = await directRes.text();
+          if (text && text.trim().length > 20 && !text.includes('<!DOCTYPE html>')) {
+            csvContent = text;
+          }
+        }
       }
 
-      setSyncStatus('connected');
-      const now = new Date();
-      setLastSynced(now);
-      localStorage.setItem('poda_last_synced', now.toISOString());
-      localStorage.setItem('poda_sheet_url', targetUrl);
-      setIsSyncing(false);
-      return true;
+      if (csvContent) {
+        setCurrentCsv(csvContent);
+        localStorage.setItem('poda_financial_csv', csvContent);
+        setSyncStatus('connected');
+        const now = new Date();
+        setLastSynced(now);
+        localStorage.setItem('poda_last_synced', now.toISOString());
+        localStorage.setItem('poda_sheet_url', targetUrl);
+        setIsSyncing(false);
+        return true;
+      }
+
+      throw new Error('Gagal mengambil data dari Google Sheet. Pastikan link publik (Anyone with link can view).');
     } catch (err: any) {
-      console.warn('Sync server error, checking fallback:', err);
+      console.warn('Sync error:', err);
       setSyncStatus('error');
       setSyncError(err.message || 'Koneksi ke spreadsheet terputus');
       setIsSyncing(false);

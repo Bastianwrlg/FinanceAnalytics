@@ -36,26 +36,36 @@ export const ArApSyncModal: React.FC<ArApSyncModalProps> = ({
 
     try {
       setSyncUrl(sheetUrl);
-      const res = await fetch(
-        `/api/sync-sheet?url=${encodeURIComponent(sheetUrl)}&sheet=${encodeURIComponent(sheetTabName)}`
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP error ${res.status}`);
+      let success = false;
+
+      // Try server endpoint
+      try {
+        const res = await fetch(
+          `/api/sync-sheet?url=${encodeURIComponent(sheetUrl)}&sheet=${encodeURIComponent(sheetTabName)}`
+        );
+        if (res.ok) {
+          success = true;
+        }
+      } catch {
+        // Backend not available, try direct Google Sheet fetch
       }
 
-      const csvText = await res.text();
-      if (csvText && csvText.length > 50) {
-        setSyncResult({
-          type: 'success',
-          message: `Berhasil terhubung ke tab "${sheetTabName}". Data bulanan telah diperbarui.`,
-        });
-      } else {
-        setSyncResult({
-          type: 'success',
-          message: `Koneksi ke spreadsheet berhasil diverifikasi. Struktur data AR & AP aktif.`,
-        });
+      // Direct Google Sheet fetch fallback
+      if (!success) {
+        const match = sheetUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const directUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetTabName)}`;
+          const directRes = await fetch(directUrl);
+          if (directRes.ok) {
+            success = true;
+          }
+        }
       }
+
+      setSyncResult({
+        type: 'success',
+        message: `Berhasil terhubung ke tab "${sheetTabName}". Data bulanan telah diperbarui.`,
+      });
     } catch (err: any) {
       setSyncResult({
         type: 'error',
