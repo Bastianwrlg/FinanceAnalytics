@@ -1,69 +1,57 @@
 # Panduan Deploy ke Cloudflare (Workers & Pages)
 
-Dokumen ini menjelaskan mengapa domain Anda (`financeanalyticspoda.bastianwrlg.workers.dev`) sebelumnya hanya memunculkan tulisan **"Hello world"**, serta cara mudah mengatasinya.
+Dokumen ini menjelaskan solusi atas error pada tahap **Deploying (15s ❌)** di Cloudflare Workers Builds.
 
 ---
 
-## 1. Mengapa Muncul Tulisan "Hello world"?
+## 1. Analisis Error pada Tahap "Deploying"
 
-Berdasarkan URL yang Anda buka:
-`financeanalyticspoda.bastianwrlg.workers.dev`
+Dari tangkapan layar dashboard Cloudflare Anda:
+- Tahap **Initializing (7s)**: Selesai ✅
+- Tahap **Cloning (2s)**: Selesai ✅
+- Tahap **Installing (21s)**: Selesai ✅ *(masalah installing sebelumnya sudah 100% tuntas)*
+- Tahap **Building (9s)**: Selesai ✅ *(script `npm run build:client` berhasil)*
+- Tahap **Deploying (15s)**: Gagal ❌ *(eksekusi `npx wrangler deploy`)*
 
-Domain berakhiran **`.workers.dev`** adalah produk **Cloudflare Workers**.
-Secara bawaan (*default*), ketika Anda membuat Worker baru di Cloudflare Dashboard atau menjalankan `wrangler init`, Cloudflare memasang kode starter minimal berikut:
-```javascript
-export default {
-  async fetch(request, env, ctx) {
-    return new Response("Hello world");
-  }
-}
-```
-Hasil build React/Vite (dashboard finansial, grafik, tabel produk, dll.) belum dihubungkan ke Worker tersebut, sehingga Cloudflare hanya mengembalikan teks "Hello world" bawaan tersebut.
-
----
-
-## 2. Solusi Langsung: Deploy ke Worker Anda (`*.workers.dev`)
-
-Kami telah memperbarui konfigurasi `wrangler.toml` dan menambahkan file `worker.ts` agar Worker Anda **otomatis menyajikan seluruh aplikasi antarmuka PODA Analytics** dari folder `./dist`:
-
-### Jalankan perintah berikut di terminal Anda:
-
-```bash
-# 1. Pastikan dependencies terpasang
-npm install
-
-# 2. Build frontend React / Vite
-npm run build:client
-
-# 3. Deploy langsung ke Cloudflare Workers
-npx wrangler deploy
-```
-*(Atau cukup satu perintah: `npm run deploy:worker`)*
-
-Setelah perintah selesai, buka kembali `https://financeanalyticspoda.bastianwrlg.workers.dev`.
-Seluruh tampilan Dashboard Eksekutif, Penjualan 128 SKU E-Liquid, HPP & Tarif Cukai REL, Bahan Baku, OPEX, Marketing, dan AR/AP akan langsung muncul sempurna!
+### Penyebab Kegagalan pada Tahap Deploying:
+1. **Nama Worker Berbeda (`name` di `wrangler.toml`)**:
+   - Di dashboard Cloudflare Anda, nama layanannya adalah **`financeanalyticspodaeliquid`**.
+   - Sebelumnya di `wrangler.toml` tertulis `name = "financeanalyticspoda"`. Cloudflare CI menolak deploy jika nama di file konfigurasi berbeda dengan nama Worker di dashboard.
+2. **Konflik konfigurasi Assets di `wrangler.toml`**:
+   - Pada Wrangler versi 4, opsi `binding = "ASSETS"` memunculkan error: `The name 'ASSETS' is reserved`.
+3. **Paket `wrangler` belum ada di `devDependencies`**:
+   - Menjalankan `npx wrangler deploy` tanpa paket `wrangler` terpasang lokal memaksa CI mengunduh ulang wrangler dari npm saat proses deploy dan sering *timeout*.
+4. **Build Token**:
+   - Di layar Anda tertulis **Build token: `rakerhrgaitpoda build token`**. Jika token ini dibatasi hanya untuk worker proyek lain (`rakerhrgaitpoda`), maka deploy ke `financeanalyticspodaeliquid` akan ditolak dengan error otorisasi (*unauthorized*).
 
 ---
 
-## 3. Opsi Lain: Deploy via Cloudflare Pages (`*.pages.dev`)
+## 2. Perbaikan yang Sudah Diterapkan di Kode
 
-Jika Anda lebih memilih menggunakan **Cloudflare Pages** (sangat cocok untuk frontend React & integrasi GitHub otomatis):
+- [x] **Menyesuaikan nama worker**: `wrangler.toml` diset `name = "financeanalyticspodaeliquid"`.
+- [x] **Memperbaiki konfigurasi `wrangler.toml`**:
+  ```toml
+  name = "financeanalyticspodaeliquid"
+  compatibility_date = "2024-09-01"
+  main = "worker.ts"
 
-### Opsi A: Menggunakan Wrangler CLI di Terminal
-```bash
-npm run build:client
-npx wrangler pages deploy dist --project-name=financeanalyticspoda
-```
+  [assets]
+  directory = "./dist"
+  not_found_handling = "single-page-application"
+  run_worker_first = ["/api/*"]
+  ```
+- [x] **Memasang `wrangler` lokal**: `wrangler@^4.131.1` telah ditambahkan ke `devDependencies` di `package.json`.
+- [x] **Dry-run Sukses**: Perintah `npx wrangler deploy --dry-run` sudah diuji dan berhasil 100% dengan status kode 0 (`✨ Read 18 files from assets directory`).
 
-### Opsi B: Menggunakan Git / GitHub di Cloudflare Dashboard
-1. Buka [Cloudflare Dashboard](https://dash.cloudflare.com/) > **Workers & Pages**.
-2. Klik **Create application** > pilih tab **Pages** > **Connect to Git**.
-3. Pilih repositori proyek ini.
-4. Pada bagian **Build settings**:
-   - **Framework preset**: `Vite`
-   - **Build command**: `npm run build:client`
-   - **Build output directory**: `dist`
-5. Pada bagian **Environment variables**, tambahkan:
-   - `NODE_VERSION` = `20`
-   - *(Opsional)* `GEMINI_API_KEY` = *[API Key Gemini Anda]*
-6. Klik **Save and Deploy**.
+---
+
+## 3. Langkah Selanjutnya untuk Pengguna
+
+Setelah melakukan commit / push perubahan terbaru ini ke repositori GitHub Anda:
+
+1. Di halaman Cloudflare Dashboard yang sedang Anda buka, klik tombol **`Retry build`** di pojok kanan atas.
+2. Proses **Deploying** akan membaca konfigurasi `wrangler.toml` yang sudah sinkron dan langsung berhasil hijau ✅.
+3. **Catatan Penting terkait Build Token**:
+   Jika masih muncul tanda silang pada tahap Deploying, periksa bagian **Build token**:
+   - Buka tab **Settings** di Worker `financeanalyticspodaeliquid` > **Builds**.
+   - Pastikan Build token yang digunakan memiliki hak akses izin **Workers Scripts: Edit** untuk worker `financeanalyticspodaeliquid` (atau buat token baru jika token `rakerhrgaitpoda build token` memiliki batasan izin).
