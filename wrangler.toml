@@ -1,4 +1,4 @@
-name = "financeanalyticspodaeliquid"
+name = "financeanalyticsptpoda"
 compatibility_date = "2024-09-01"
 main = "worker.ts"
 
